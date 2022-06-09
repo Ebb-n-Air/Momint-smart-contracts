@@ -4,9 +4,6 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-/**
-* @dev  Interface for interacting with an ERC20 token
-*/
 interface IERC20 {
     function totalSupply() external view returns (uint);
 
@@ -24,8 +21,8 @@ interface IERC20 {
         uint amount
     ) external returns (bool);
 
-    event Transfer(address indexed from, address indexed to, uint amount);
-    event Approval(address indexed owner, address indexed spender, uint amount);
+    event Transfer(address indexed from, address indexed to, uint value);
+    event Approval(address indexed owner, address indexed spender, uint value);
 }
 
 contract MomintNFT is ERC721, Ownable {
@@ -36,11 +33,21 @@ contract MomintNFT is ERC721, Ownable {
     uint256 private _nextMintId; //utility to track what token number we are currently on
 
     struct BatchTokenInfo {
-        address[] batchTokenHolders;
         uint256 amountOfBatch;
         uint256 amountMinted;
         uint256 lastMintedId;
         string batchURI;
+
+        address erc20tokenAddress; // Address of the ERC20 token deposited into the batch
+        uint256 ethDepositId; // Id of the specific deposit in ETH
+        uint256 erc20DepositId; // Id of the specific deposit in ERC20
+        mapping(uint256 => mapping(uint256 => uint256)) ethDepositBalance; // Amount of eth deposited for a given batch
+        mapping(uint256 => mapping(uint256 => uint256)) erc20DepositBalance; // Amount of ERC20 tokens deposited for a given batch
+        mapping(uint256 => mapping(address => bool)) hasWithdrawnForIdAndEth; // Keeps track of addresses who have alread withdrawn from deposits in ETH
+        mapping(uint256 => mapping(address => bool)) hasWithdrawnForIdAndERC20; // Keeps track of addresses who have alread withdrawn from deposits in ERC20
+        mapping(address => bool) isTokenHolder; // Keeps track of whether or not an address is a token holder
+        mapping(address => uint) indexOf; // Keeps track of the indexes of token holders
+        address[] tokenHolders; // Stores the token holders of a specific batch
     } // stores the batch info for a given batch
 
     mapping(uint256 => BatchTokenInfo) private batchInfo_; // Original token ID => batch info
@@ -68,6 +75,132 @@ contract MomintNFT is ERC721, Ownable {
     }
 
     /**
+     * Adds a specific token holder to a new batch
+     * @param   receiver The address to be added to the batch
+     */
+    function _addTokenHolderToNewBatch(
+        address receiver
+    ) internal {
+        batchInfo_[_nextMintId].indexOf[receiver] = batchInfo_[_nextMintId].tokenHolders.length;
+        batchInfo_[_nextMintId].tokenHolders.push(receiver);
+    }
+
+    /**
+     * Adds a specific token holder to an existing batch
+     * @param   receiver The address to be added to the batch
+     * @param   originalId The ID of the parant token
+     */
+    function _addTokenHolderToExistingBatch(
+        address receiver,
+        uint256 originalId
+    ) internal {
+        batchInfo_[originalId].indexOf[receiver] = batchInfo_[originalId].tokenHolders.length;
+        batchInfo_[originalId].tokenHolders.push(receiver);
+    }
+
+    /**
+     * Removes a specific token holder from a batch
+     * @param   tokenHolder The address to be removed
+     * @param   tokenId The Id of the NFT held by the token holder
+     */
+    function _removeTokenHolderFromBatch(
+        address tokenHolder,
+        uint256 tokenId
+    ) internal {
+        uint originalId = originalTokenId(tokenId);
+        uint256 index = batchInfo_[originalId].indexOf[tokenHolder];
+        uint256 lastIndex = batchInfo_[originalId].tokenHolders.length - 1;
+        address lastTokenHolder = batchInfo_[originalId].tokenHolders[lastIndex];
+
+        batchInfo_[originalId].indexOf[lastTokenHolder] = index;
+        delete batchInfo_[originalId].indexOf[tokenHolder];
+
+        batchInfo_[originalId].tokenHolders[index] = lastTokenHolder;
+        batchInfo_[originalId].tokenHolders.pop();
+    }
+
+    /**
+     * Gets a list of addresses, which hold tokens of a specifc batch
+     * @param   originalId The ID of the parant token of the batch
+     * @return   Returns a list of addresses, which hold tokens of a specific batch
+     */
+    function getBatchTokenHolders(uint256 originalId) external view returns (address[] memory) {
+        return batchInfo_[originalId].tokenHolders;
+    }
+
+    /**
+     * Pay the token holders of a specific batch in ETH
+     * @param   originalId The ID of the parant token of the batch
+     */
+    function payBatchInEth(uint256 originalId) external payable {
+        uint256 ethDepositId = batchInfo_[originalId].ethDepositId;
+        batchInfo_[originalId].ethDepositBalance[originalId][ethDepositId] = msg.value;
+        batchInfo_[originalId].ethDepositId++;
+    }
+
+    /**
+     * Pay the token holders of a specific batch in ERC20 tokens
+     * @param   token The address of the ERC20 token to be uses
+     * @param   _amount The amount of ERC20 tokens to be deposited
+     * @param   originalId The ID of the parant token of the batch
+     */
+    function payBatchInERC20(IERC20 token, uint256 _amount, uint256 originalId) external {
+        uint256 amount = _amount * 10 ** 18;
+        uint256 erc20DepositId = batchInfo_[originalId].erc20DepositId;
+        batchInfo_[originalId].erc20tokenAddress = address(token);
+        batchInfo_[originalId].erc20DepositBalance[originalId][erc20DepositId] = amount;
+        token.transferFrom(msg.sender, address(this), amount);
+        batchInfo_[originalId].erc20DepositId++;
+    }
+
+    /**
+     * Withdraw all of the ETH for a specific deposit and receiver
+     * @param   originalId ID of the parent token of a batch
+     * @param   ethDepositId The ID of the deposited ETH (first deposit will have ID of zero, second ID of 1 and so on)
+     */
+    function withdrawEth(uint256 originalId, uint256 ethDepositId) external {
+        require(batchInfo_[originalId].isTokenHolder[msg.sender] == true, "Not a batch token holder");
+        require(batchInfo_[originalId].hasWithdrawnForIdAndEth[ethDepositId][msg.sender] == false, "You have already withdrawn ETH");
+        uint256 numTokenHoldersInBatch = batchInfo_[originalId].tokenHolders.length;
+        uint256 amount = batchInfo_[originalId].ethDepositBalance[originalId][ethDepositId];
+        uint256 amountToTransfer = amount / numTokenHoldersInBatch;
+        payable(msg.sender).transfer(amountToTransfer);
+        batchInfo_[originalId].hasWithdrawnForIdAndEth[ethDepositId][msg.sender] = true;
+    }
+
+    /**
+     * Withdraw all of the ERC20 for a specific deposit and receiver
+     * @param   token The address of the ERC20 token to be deposited
+     * @param   originalId ID of the parent token of a batch
+     * @param   erc20DepositId The ID of the deposited ERC20 tokens (first deposit will have ID of zero, second ID of 1 and so on)
+     */
+    function withdrawERC20(IERC20 token, uint256 originalId, uint256 erc20DepositId) external {
+        require(batchInfo_[originalId].isTokenHolder[msg.sender] == true, "Not a batch token holder");
+        require(batchInfo_[originalId].hasWithdrawnForIdAndERC20[erc20DepositId][msg.sender] == false, "You have already withdrawn ERC20 tokens");
+        uint256 numTokenHoldersInBatch = batchInfo_[originalId].tokenHolders.length;
+        uint256 amount = batchInfo_[originalId].erc20DepositBalance[originalId][erc20DepositId];
+        uint256 amountToTransfer = amount / numTokenHoldersInBatch;
+        token.transfer(msg.sender, amountToTransfer);
+        batchInfo_[originalId].hasWithdrawnForIdAndERC20[erc20DepositId][msg.sender] = true;
+    }
+
+    /**
+     * Transfer function, which overrides the original ERC721 function
+     */
+    function transferFrom(
+        address from,
+        address to,
+        uint256 tokenId
+    ) public override {
+        uint originalId = originalTokenId(tokenId);
+        batchInfo_[originalId].isTokenHolder[from] = false;
+        batchInfo_[originalId].isTokenHolder[to] = true;
+        _removeTokenHolderFromBatch(from, tokenId);
+        _addTokenHolderToExistingBatch(to, originalId);
+        _transfer(from, to, tokenId);
+    } 
+
+    /**
      * Mint a single token that is also a batch (ie. a 1 of 1)
      * @param   receiver Address that will receive the token
      * @param   batchURI IPFS link for token content
@@ -81,7 +214,6 @@ contract MomintNFT is ERC721, Ownable {
         require(amountOfBatch < MAX_BATCH, "more than batch");
         require(amountOfBatch > 0, "must be over zero to mint");
 
-        batchInfo_[_nextMintId].batchTokenHolders.push(receiver);
         batchInfo_[_nextMintId].amountOfBatch = amountOfBatch;
         batchInfo_[_nextMintId].amountMinted = 1;
         batchInfo_[_nextMintId].lastMintedId = _nextMintId;
@@ -90,6 +222,8 @@ contract MomintNFT is ERC721, Ownable {
 
         emit Batch(receiver, _nextMintId, amountOfBatch);
 
+        batchInfo_[_nextMintId].isTokenHolder[receiver] = true;
+        _addTokenHolderToNewBatch(receiver);
         _mint(receiver, _nextMintId);
         _nextMintId++;
         return (_nextMintId - 1);
@@ -117,50 +251,16 @@ contract MomintNFT is ERC721, Ownable {
         previoustInBatch_[_nextMintId] = batchInfo_[originalId].lastMintedId;
         batchInfo_[originalId].amountMinted++;
         batchInfo_[originalId].lastMintedId = _nextMintId;
-        batchInfo_[originalId].batchTokenHolders.push(receiver);
         originalTokenId_[_nextMintId] = originalId;
+
+        if(batchInfo_[originalId].isTokenHolder[receiver] == false) {
+            batchInfo_[originalId].isTokenHolder[receiver] = true;
+            _addTokenHolderToExistingBatch(receiver, originalId);
+        }
 
         _mint(receiver, _nextMintId);
         _nextMintId++;
         return (_nextMintId - 1);
-    }
-
-    /**
-     * Gets all of the addresses associated with a specific batch
-     * @param   tokenId the tokenID of supposed 'parent' token
-     * @return returns the addresses mentioned above
-     */
-    function getTokenOwnersOfBatch(uint256 tokenId) public view returns (address[] memory) {
-        return batchInfo_[tokenId].batchTokenHolders;
-    }
-
-    /**
-     * This function pays out the accounts associated witha  specific batch in ETH
-     * @param   tokenId the tokenID of supposed 'parent' token
-     */
-    function payBatchTokenHoldersInEth(uint256 tokenId) external payable {
-        uint256 numBatchTokenHolders = getTokenOwnersOfBatch(tokenId).length;
-        uint256 amount = msg.value / numBatchTokenHolders;
-        for(uint256 i = 0; i < numBatchTokenHolders; i++) {
-            address batchTokenHolder = batchInfo_[tokenId].batchTokenHolders[i];
-            payable(batchTokenHolder).transfer(amount);
-        }
-    }
-
-    /**
-     * This function pays out the accounts associated witha  specific batch in the associated ERC20 token of a batch
-     * @param   tokenId the tokenID of supposed 'parent' token
-     * @param   token the address of the ERC20 token to be transferred
-     * @param   amountOfToken the amount of said ERC20 token to be transferred
-     */
-    function payBatchTokenHoldersInERC20(uint256 tokenId, IERC20 token, uint256 amountOfToken) external {
-        uint numBatchTokenHolders = getTokenOwnersOfBatch(tokenId).length;
-        uint amount = amountOfToken * 10 ** 18;
-        uint amountToTransfer = amount / numBatchTokenHolders;
-        for(uint256 i = 0; i < numBatchTokenHolders; i++) {
-            address batchTokenHolder = batchInfo_[tokenId].batchTokenHolders[i];
-            token.transferFrom(msg.sender, batchTokenHolder, amountToTransfer);
-        }
     }
 
     /**
@@ -283,6 +383,10 @@ contract MomintNFT is ERC721, Ownable {
     /** Burn a token
      */
     function burnTokenFrom(uint256 _tokenId) external onlyOwner {
+        address tokenHolder = ownerOf(_tokenId);
+        _removeTokenHolderFromBatch(tokenHolder, _tokenId);
+        batchInfo_[originalTokenId(_tokenId)].isTokenHolder[tokenHolder] = false;
+
         require(approveBurn_[_tokenId], "Token not approved by owner");
         _burn(_tokenId);
     }
