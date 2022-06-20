@@ -29,6 +29,7 @@ contract MomintToken is Initializable, ERC1155Upgradeable, AccessControlUpgradea
     bytes32 public constant URI_SETTER_ROLE = keccak256("URI_SETTER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
+    uint256 private _nextMintId; //utility to track what token number we are currently on
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -69,11 +70,12 @@ contract MomintToken is Initializable, ERC1155Upgradeable, AccessControlUpgradea
      * 
      * - the caller must have the `MINTER_ROLE`.
      */
-    function mint(address account, uint256 id, uint256 amount, bytes memory data)
+    function mint(address account, uint256 amount, bytes memory data)
         public
         onlyRole(MINTER_ROLE)
     {
-        _mint(account, id, amount, data);
+        _mint(account, _nextMintId, amount, data);
+        _nextMintId++;
     }
 
     /**
