@@ -1,0 +1,24 @@
+{
+  "canisters": {
+    "erc721_replica": {
+      "main": "icp-contracts/erc721_replica/main.mo",
+      "type": "motoko"
+    },
+    "data": {
+      "main": "icp-contracts/data/main.mo",
+      "type": "motoko"
+    },
+    "airdrop": {
+      "main": "icp-contracts/airdrop/main.mo",
+      "type": "motoko"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": "mops sources"
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
