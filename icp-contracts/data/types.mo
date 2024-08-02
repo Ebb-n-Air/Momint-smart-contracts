@@ -1,5 +1,7 @@
+import Text "mo:base/Text";
 module {
   public type Entry = {
+    id: Text;
     consumptionPower : Nat;
     updatedTime : Text;
     plantName : Text;
