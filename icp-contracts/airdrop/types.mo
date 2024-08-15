@@ -1,7 +1,6 @@
 module {
-    public let value = 0;
-    
-    public func name(arg : Text) : () {
-        
-    };
+     public let ContractActor = actor "owuqd-dyaaa-aaaah-qapxq-cai" : actor {
+    details : shared query TokenIdentifier -> async Result_7;
+  };
+
 };
