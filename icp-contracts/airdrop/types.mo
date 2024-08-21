@@ -52,23 +52,8 @@ module {
     getMetadataDip721 : shared query TokenId -> async MetadataResult;
     getMetadataForUserDip721 : shared Principal -> async ExtendedMetadataResult;
     getTokenIdsForUserDip721 : shared query Principal -> async [TokenId];
-    logoDip721 : shared query () -> async LogoResult;
-    mintDip721 : shared (Principal, MetadataDesc) -> async MintReceipt;
-    nameDip721 : shared query () -> async Text;
     ownerOfDip721 : shared query TokenId -> async OwnerResult;
-    safeTransferFromDip721 : shared (
-      Principal,
-      Principal,
-      TokenId,
-    ) -> async TxReceipt;
-    supportedInterfacesDip721 : shared query () -> async [InterfaceId];
-    symbolDip721 : shared query () -> async Text;
-    totalSupplyDip721 : shared query () -> async Nat64;
-    transferFromDip721 : shared (
-      Principal,
-      Principal,
-      TokenId,
-    ) -> async TxReceipt;
+    getAllOwners: shared query () -> async [Principal] ;
   };
 
   // ICRC1 Interface

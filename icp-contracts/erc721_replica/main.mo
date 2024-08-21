@@ -163,4 +163,9 @@ shared actor class Dip721NFT(custodian: Principal, init : Types.Dip721NonFungibl
       id = transactionId;
     });
   };
+
+  public shared query func getAllOwners() : async [Principal] {
+    let owners = List.map(nfts, func (item : Types.Nft) : Principal { item.owner });
+    return List.toArray(owners);
+  };
 }
