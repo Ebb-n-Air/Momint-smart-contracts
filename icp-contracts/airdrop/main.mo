@@ -22,6 +22,7 @@ actor {
         address = "mxzaz-hqaaa-aaaar-qaada-cai";
         decimals = 100_000_000;
     };
+
     let SharesContract = Types.ContractActor;
 
     stable var airdropAmount : AirdropValueType = {
@@ -101,15 +102,19 @@ actor {
     private func transfereTokens(beneficiary : Principal, token : TokenType) : async Result.Result<(), Text> {
         switch (token) {
             case (#ckUSDC) {
+                // TODO: Transfer tokens
                 return #ok();
             };
             case (#ckUSDT) {
+                // TODO: Transfer tokens
                 return #ok();
             };
             case (#ckETH) {
+                // TODO: Transfer tokens
                 return #ok();
             };
             case (#ckBTC) {
+                // TODO: Transfer tokens
                 return #ok();
             };
         };
