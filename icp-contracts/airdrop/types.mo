@@ -1,4 +1,54 @@
+import Time "mo:base/Time";
+import Nat64 "mo:base/Nat64";
 module {
+  /*************************
+    * Common Types
+  *************************/
+    public type AirdropValueType = {
+        amount : Nat;
+        token : TokenType;
+    };
+
+    public type Beneficaries = {
+        #detectOnChain;
+        #input : [Principal];
+    };
+
+    public type TokenType = {
+        #ckUSDC;
+        #ckUSDT;
+        #ckETH;
+        #ckBTC;
+    };
+
+    public type Airdrop = {
+      id: Nat64;
+        beneficiaries : [Principal];
+        token : TokenType;
+        amount : Nat;
+        status : AirdropStatus;
+        timestamp : Time.Time;
+    };
+
+    type AirdropStatus = {
+        #pending;
+        #completed;
+        #failed;
+    };
+
+   public type InternalTransaction = {
+        id : Nat64;
+        from : Principal;
+        to : Principal;
+        amount : Nat;
+        token : TokenType;
+        timestamp : Time.Time;
+    };
+
+
+  /*************************    
+    * dip721_replica Interface
+  *************************/
     public type ApiError = {
     #ZeroAddress;
     #InvalidTokenId;
@@ -56,7 +106,10 @@ module {
     getAllOwners: shared query () -> async [Principal] ;
   };
 
-  // ICRC1 Interface
+  /*************************
+    * Token Interface
+  *************************/
+
   public type Account = { owner : Principal; subaccount : ?Blob };
   public type MetadataValue = {
     #Int : Int;
