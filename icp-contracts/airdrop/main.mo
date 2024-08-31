@@ -6,6 +6,7 @@ import Nat64 "mo:base/Nat64";
 import List "mo:base/List";
 import Time "mo:base/Time";
 import Buffer "mo:base/Buffer";
+import Array "mo:base/Array";
 
 shared actor class AIRDROP() = this {
     type TokenLedgersInterface = Types.TokenInterface;
@@ -38,7 +39,7 @@ shared actor class AIRDROP() = this {
     let SharesContract = Types.ContractActor;
 
     stable var airdropAmount : AirdropValueType = {
-        amount = 0;
+        dividentAmount = 0;
         token = #ckUSDC;
     };
     public shared ({ caller }) func payBeneficiaries(payments : Beneficaries, token : TokenType) : async Result.Result<(), Text> {
@@ -46,8 +47,14 @@ shared actor class AIRDROP() = this {
         if (token != airdropAmount.token) {
             return #err("Airdrop token should be set first.");
         };
-        if (airdropAmount.amount == 0) {
-            return #err("Airdrop amount should be set first.");
+        if (airdropAmount.dividentAmount == 0) {
+            return #err("Airdrop divident amount should be set first.");
+        };
+
+        let balance = await checkContractBalance(token);
+
+        if (balance < airdropAmount.dividentAmount) {
+            return #err("Insufficient funds in the contract., top up the contract balance.");
         };
 
         let users = switch (payments) {
@@ -63,26 +70,42 @@ shared actor class AIRDROP() = this {
             id = Nat64.fromNat(List.size(airdrops));
             beneficiaries = users;
             token = token;
-            amount = airdropAmount.amount;
+            dividentAmount = airdropAmount.dividentAmount;
             status = #pending;
             timestamp = Time.now();
         };
         airdrops := List.push(airdrop, airdrops);
-        for (beneficiary in users.vals()) {
-            let result = await transfereTokens(beneficiary, token);
-            switch (result) {
-                case (#ok()) {
+
+        // If the nfts are not preminted
+        // var totalTokens : Nat = 0;
+        // for (user in users.vals()) {
+        //     let userTokens = await SharesContract.getTokenIdsForUserDip721(user);
+        //     totalTokens += Array.size(userTokens);
+        // };
+
+        let totalShares = await SharesContract.totalSupplyDip721();
+
+        for (user in users.vals()) {
+            let userTokens = await SharesContract.getTokenIdsForUserDip721(user);
+            let userTokenCount = Array.size(userTokens);
+
+            let userShare = (userTokenCount * airdropAmount.dividentAmount) / Nat64.toNat(totalShares);
+
+            let transferResult = await transfereTokens(user, token, userShare);
+
+            switch (transferResult) {
+                case (#ok(())) {
                     let transaction : InternalTransaction = {
                         id = Nat64.fromNat(List.size(internalTransactions));
                         from = Principal.fromActor(this);
-                        to = beneficiary;
-                        amount = airdropAmount.amount;
+                        to = user;
+                        amount = userShare;
                         token = token;
                         timestamp = Time.now();
                     };
                     internalTransactions := List.push(transaction, internalTransactions);
                 };
-                case (#err(err)) {
+                case (#err(errMsg)) {
                     func updateDrop(drop : Airdrop) : Airdrop {
                         if (drop.id == airdrop.id) {
                             return {
@@ -94,7 +117,7 @@ shared actor class AIRDROP() = this {
                         };
                     };
                     airdrops := List.map(airdrops, updateDrop);
-                    return #err(err);
+                    return #err(errMsg);
                 };
             };
         };
@@ -109,7 +132,7 @@ shared actor class AIRDROP() = this {
             };
         };
         airdrops := List.map(airdrops, updateDrop);
-        airdropAmount := { amount = 0; token = token };
+        airdropAmount := { dividentAmount = 0; token = token };
         return #ok;
     };
 
@@ -130,7 +153,7 @@ shared actor class AIRDROP() = this {
         return airdropAmount;
     };
 
-    private func transfereTokens(beneficiary : Principal, token : TokenType) : async Result.Result<(), Text> {
+    private func transfereTokens(beneficiary : Principal, token : TokenType, amount : Nat) : async Result.Result<(), Text> {
         let tokenInfo = switch (token) {
             case (#ckUSDC) { ckUSDCLedgerAddress };
             case (#ckUSDT) { ckUSDTLedgerAddress };
@@ -146,7 +169,7 @@ shared actor class AIRDROP() = this {
             memo = null;
             from_subaccount = null;
             created_at_time = null;
-            amount = airdropAmount.amount * tokenInfo.decimals;
+            amount = amount * tokenInfo.decimals;
         };
 
         switch (await ledger.icrc1_transfer(transferArg)) {
@@ -186,5 +209,20 @@ shared actor class AIRDROP() = this {
                 "Insufficient funds, balance: " # Nat.toText(details.balance);
             };
         };
+    };
+
+    func checkContractBalance(token : TokenType) : async Nat {
+        let tokenInfo = switch (token) {
+            case (#ckUSDC) { ckUSDCLedgerAddress };
+            case (#ckUSDT) { ckUSDTLedgerAddress };
+            case (#ckETH) { ckETHLedgerAddress };
+            case (#ckBTC) { ckBTCLedgerAddress };
+        };
+
+        let ledger = actor (tokenInfo.address) : TokenLedgersInterface;
+        return await ledger.icrc1_balance_of({
+            owner = Principal.fromActor(this);
+            subaccount = null;
+        });
     };
 };

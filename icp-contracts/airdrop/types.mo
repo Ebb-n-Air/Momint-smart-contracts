@@ -5,7 +5,7 @@ module {
     * Common Types
   *************************/
     public type AirdropValueType = {
-        amount : Nat;
+        dividentAmount : Nat;
         token : TokenType;
     };
 
@@ -25,7 +25,7 @@ module {
       id: Nat64;
         beneficiaries : [Principal];
         token : TokenType;
-        amount : Nat;
+        dividentAmount : Nat;
         status : AirdropStatus;
         timestamp : Time.Time;
     };
@@ -103,6 +103,7 @@ module {
     getMetadataForUserDip721 : shared Principal -> async ExtendedMetadataResult;
     getTokenIdsForUserDip721 : shared query Principal -> async [TokenId];
     ownerOfDip721 : shared query TokenId -> async OwnerResult;
+    totalSupplyDip721 : shared query () -> async Nat64;
     getAllOwners: shared query () -> async [Principal] ;
   };
 
