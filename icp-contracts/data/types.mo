@@ -1,10 +1,13 @@
+import Text "mo:base/Text";
 module {
   public type Entry = {
+    id: Text;
     consumptionPower : Nat;
     updatedTime : Text;
     plantName : Text;
     productionPower : Nat;
     gridPower : Nat;
+    signature : Text;
     timeZone : Text;
   };
   public type Self = actor {

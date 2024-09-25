@@ -1,73 +1,95 @@
+import Nat "mo:base/Nat";
+import Nat8 "mo:base/Nat8";
+import Nat16 "mo:base/Nat16";
+import Nat32 "mo:base/Nat32";
+import Nat64 "mo:base/Nat64";
+import Blob "mo:base/Blob";
+import Principal "mo:base/Principal";
+
 module {
+  public type Dip721NonFungibleToken = {
+    logo: LogoResult;
+    name: Text;
+    symbol: Text;
+    maxLimit : Nat16;
+  };
+
   public type ApiError = {
-    #ZeroAddress;
-    #InvalidTokenId;
     #Unauthorized;
+    #InvalidTokenId;
+    #ZeroAddress;
     #Other;
   };
-  public type Dip721NonFungibleToken = {
-    maxLimit : Nat16;
-    logo : LogoResult;
-    name : Text;
-    symbol : Text;
+
+  public type Result<S, E> = {
+    #Ok : S;
+    #Err : E;
   };
-  public type ExtendedMetadataResult = {
-    #Ok : { token_id : TokenId; metadata_desc : MetadataDesc };
-    #Err : ApiError;
-  };
+
+  public type OwnerResult = Result<Principal, ApiError>;
+  public type TxReceipt = Result<Nat, ApiError>;
+  
+  public type TransactionId = Nat;
+  public type TokenId = Nat64;
+
   public type InterfaceId = {
-    #Burn;
-    #Mint;
     #Approval;
     #TransactionHistory;
+    #Mint;
+    #Burn;
     #TransferNotification;
   };
-  public type LogoResult = { data : Text; logo_type : Text };
+
+  public type LogoResult = {
+    logo_type: Text;
+    data: Text;
+  };
+
+  public type Nft = {
+    owner: Principal;
+    id: TokenId;
+    metadata: MetadataDesc;
+  };
+
+  public type ExtendedMetadataResult = Result<{
+    metadata_desc: MetadataDesc;
+    token_id: TokenId;
+  }, ApiError>;
+
+  public type MetadataResult = Result<MetadataDesc, ApiError>;
+
   public type MetadataDesc = [MetadataPart];
-  public type MetadataKeyVal = { key : Text; val : MetadataVal };
+
   public type MetadataPart = {
-    data : Blob;
-    key_val_data : [MetadataKeyVal];
-    purpose : MetadataPurpose;
+    purpose: MetadataPurpose;
+    key_val_data: [MetadataKeyVal];
+    data: Blob;
   };
-  public type MetadataPurpose = { #Preview; #Rendered };
-  public type MetadataResult = { #Ok : MetadataDesc; #Err : ApiError };
+
+  public type MetadataPurpose = {
+    #Preview;
+    #Rendered;
+  };
+  
+  public type MetadataKeyVal = {
+    key: Text;
+    val: MetadataVal;
+  };
+
   public type MetadataVal = {
-    #Nat64Content : Nat64;
-    #Nat32Content : Nat32;
-    #Nat8Content : Nat8;
-    #NatContent : Nat;
-    #Nat16Content : Nat16;
-    #BlobContent : Blob;
     #TextContent : Text;
+    #BlobContent : Blob;
+    #NatContent : Nat;
+    #Nat8Content: Nat8;
+    #Nat16Content: Nat16;
+    #Nat32Content: Nat32;
+    #Nat64Content: Nat64;
   };
-  public type MintReceipt = { #Ok : MintReceiptPart; #Err : ApiError };
-  public type MintReceiptPart = { id : Nat; token_id : TokenId };
-  public type OwnerResult = { #Ok : Principal; #Err : ApiError };
-  public type TokenId = Nat64;
-  public type TxReceipt = { #Ok : Nat; #Err : ApiError };
-  public type Self = actor {
-    balanceOfDip721 : shared query Principal -> async Nat64;
-    getMaxLimitDip721 : shared query () -> async Nat16;
-    getMetadataDip721 : shared query TokenId -> async MetadataResult;
-    getMetadataForUserDip721 : shared Principal -> async ExtendedMetadataResult;
-    getTokenIdsForUserDip721 : shared query Principal -> async [TokenId];
-    logoDip721 : shared query () -> async LogoResult;
-    mintDip721 : shared (Principal, MetadataDesc) -> async MintReceipt;
-    nameDip721 : shared query () -> async Text;
-    ownerOfDip721 : shared query TokenId -> async OwnerResult;
-    safeTransferFromDip721 : shared (
-        Principal,
-        Principal,
-        TokenId,
-      ) -> async TxReceipt;
-    supportedInterfacesDip721 : shared query () -> async [InterfaceId];
-    symbolDip721 : shared query () -> async Text;
-    totalSupplyDip721 : shared query () -> async Nat64;
-    transferFromDip721 : shared (
-        Principal,
-        Principal,
-        TokenId,
-      ) -> async TxReceipt;
-  }
-}
+
+  public type MintReceipt = Result<MintReceiptPart, ApiError>;
+
+  public type MintReceiptPart = {
+    token_id: TokenId;
+    id: Nat;
+  };
+};
