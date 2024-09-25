@@ -40,6 +40,7 @@ module {
         id : Nat64;
         from : Principal;
         to : Principal;
+        txnId : Nat;
         amount : Nat;
         token : TokenType;
         timestamp : Time.Time;
@@ -96,7 +97,7 @@ module {
   public type OwnerResult = { #Ok : Principal; #Err : ApiError };
   public type TokenId = Nat64;
   public type TxReceipt = { #Ok : Nat; #Err : ApiError };
-  public let ContractActor = actor "7duo2-jiaaa-aaaak-aktxq-cai" : actor {
+  public let ContractActor = actor "br5f7-7uaaa-aaaaa-qaaca-cai" : actor {
     balanceOfDip721 : shared query Principal -> async Nat64;
     getMaxLimitDip721 : shared query () -> async Nat16;
     getMetadataDip721 : shared query TokenId -> async MetadataResult;

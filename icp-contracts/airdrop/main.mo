@@ -7,6 +7,7 @@ import List "mo:base/List";
 import Time "mo:base/Time";
 import Buffer "mo:base/Buffer";
 import Array "mo:base/Array";
+import Debug "mo:base/Debug";
 
 shared actor class AIRDROP() = this {
     type TokenLedgersInterface = Types.TokenInterface;
@@ -20,7 +21,7 @@ shared actor class AIRDROP() = this {
     stable var internalTransactions = List.nil<InternalTransaction>();
 
     let ckUSDCLedgerAddress = {
-        address = "xevnm-gaaaa-aaaar-qafnq-cai";
+        address = "mxzaz-hqaaa-aaaar-qaada-cai";
         decimals = 1_000_000;
     };
     let ckUSDTLedgerAddress = {
@@ -43,7 +44,7 @@ shared actor class AIRDROP() = this {
         token = #ckUSDC;
     };
     public shared ({ caller }) func payBeneficiaries(payments : Beneficaries, token : TokenType) : async Result.Result<(), Text> {
-        assert (Principal.isController(caller));
+        assert (Principal.isController(caller)); 
         if (token != airdropAmount.token) {
             return #err("Airdrop token should be set first.");
         };
@@ -75,30 +76,31 @@ shared actor class AIRDROP() = this {
             timestamp = Time.now();
         };
         airdrops := List.push(airdrop, airdrops);
-
-        // If the nfts are not preminted
-        // var totalTokens : Nat = 0;
-        // for (user in users.vals()) {
-        //     let userTokens = await SharesContract.getTokenIdsForUserDip721(user);
-        //     totalTokens += Array.size(userTokens);
-        // };
-
         let totalShares = await SharesContract.totalSupplyDip721();
+
+        let tokenInfo = switch (token) {
+            case (#ckUSDC) { ckUSDCLedgerAddress };
+            case (#ckUSDT) { ckUSDTLedgerAddress };
+            case (#ckETH) { ckETHLedgerAddress };
+            case (#ckBTC) { ckBTCLedgerAddress };
+        };
 
         for (user in users.vals()) {
             let userTokens = await SharesContract.getTokenIdsForUserDip721(user);
+
             let userTokenCount = Array.size(userTokens);
 
-            let userShare = (userTokenCount * airdropAmount.dividentAmount) / Nat64.toNat(totalShares);
+            let userShare = (userTokenCount * airdropAmount.dividentAmount * tokenInfo.decimals ) / Nat64.toNat(totalShares);
 
             let transferResult = await transfereTokens(user, token, userShare);
 
             switch (transferResult) {
-                case (#ok(())) {
+                case (#ok(val)) {
                     let transaction : InternalTransaction = {
                         id = Nat64.fromNat(List.size(internalTransactions));
                         from = Principal.fromActor(this);
                         to = user;
+                        txnId = val;
                         amount = userShare;
                         token = token;
                         timestamp = Time.now();
@@ -140,6 +142,13 @@ shared actor class AIRDROP() = this {
         return List.toArray(airdrops);
     };
 
+    public shared func getAllOwners() : async [Principal] {
+        let _ids = await SharesContract.getAllOwners();
+        let idsBuffer = Buffer.fromArray<Principal>(_ids);
+        Buffer.removeDuplicates<Principal>(idsBuffer, Principal.compare);
+        Buffer.toArray<Principal>(idsBuffer);
+    };
+
     public shared query func getInternalTransactions() : async [InternalTransaction] {
         return List.toArray(internalTransactions);
     };
@@ -153,7 +162,7 @@ shared actor class AIRDROP() = this {
         return airdropAmount;
     };
 
-    private func transfereTokens(beneficiary : Principal, token : TokenType, amount : Nat) : async Result.Result<(), Text> {
+    private func transfereTokens(beneficiary : Principal, token : TokenType, amount : Nat) : async Result.Result<Nat, Text> {
         let tokenInfo = switch (token) {
             case (#ckUSDC) { ckUSDCLedgerAddress };
             case (#ckUSDT) { ckUSDTLedgerAddress };
@@ -169,15 +178,15 @@ shared actor class AIRDROP() = this {
             memo = null;
             from_subaccount = null;
             created_at_time = null;
-            amount = amount * tokenInfo.decimals;
+            amount = amount;
         };
 
         switch (await ledger.icrc1_transfer(transferArg)) {
             case (#Err(error)) {
                 return #err(handleTransferError(error));
             };
-            case (#Ok(_)) {
-                return #ok();
+            case (#Ok(val)) {
+                return #ok(val);
             };
         };
     };

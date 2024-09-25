@@ -7,6 +7,7 @@ module {
     plantName : Text;
     productionPower : Nat;
     gridPower : Nat;
+    signature : Text;
     timeZone : Text;
   };
   public type Self = actor {
