@@ -15,9 +15,10 @@ This repository contains a collection of smart contracts developed for various p
    - A contract for performing simple airdrops of ERC20 tokens.
 
 4. **main.mo (Motoko)**
+   - Read more here: https://forum.dfinity.org/t/tokenising-solar-on-chain/31930?u=ahrenfullstop
    - A contract for managing entries with consumption and production power data.
 
-5. **AIRDROP.mo (Motoko)**
+6. **AIRDROP.mo (Motoko)**
    - A contract for managing airdrops on the Internet Computer platform.
 
 ## Prerequisites
@@ -94,3 +95,17 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License.
+```
+ .\\            //.
+. \ \          / /.
+.\  ,\     /` /,.-
+ -.   \  /'/ /  .
+ ` -   `-'  \  -
+   '.       /.\`
+      -    .-
+      :`//.'
+      .`.'
+      .'  ⏸️       
+```
+
+Made with ❤️ by the Momint Team
